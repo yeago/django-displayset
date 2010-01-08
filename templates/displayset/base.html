@@ -1,0 +1,24 @@
+{% extends "admin/change_list.html" %}
+{% load admin_list %}
+{% block menu %}{% endblock %}
+
+{% block filters %}
+{% if filter.form.fields %}
+<div id="changelist-filter">
+<form action="." method="get" class="side_form">
+	<fieldset>
+		{% for field in filter.form %}
+		<div>
+			{{ field.label_tag }}
+			{{ field }}
+			{{ field.errors }}
+		</div>
+		{% endfor %}
+		<div>
+			<input class="submit" type="submit" name="submit" value="Run Report" />
+		</div>
+	</fieldset>
+</form>
+</div>
+{% endif %}
+{% endblock %}
