@@ -13,7 +13,7 @@ class DefaultDisplaySite(object):
 	actions = []
 	root_path = '/'
 	name = 'Default DisplaySet Site' 
-
+	
 	def admin_view(self,view):
 		def no_wrap(request,*args,**kwargs):
 			return view(request,*args,**kwargs)
@@ -61,7 +61,7 @@ class DisplayList(ChangeList):
 							attr = getattr(self.model, field_name)
 						order_field = attr.admin_order_field
 					except AttributeError:
-						if field_name in self.filtered_queryset.query.aggregate_select: #****
+						if field_name in self.filtered_queryset.query.aggregates or field_name in self.filtered_queryset.query.extra: #****
 							order_field = field_name
 				else:
 					order_field = f.name
@@ -100,6 +100,7 @@ class DisplayList(ChangeList):
 		
 class DisplaySet(adminoptions.ModelAdmin):
 	change_list_template = 'displayset/base.html'
+
 	def __init__(self,queryset,display_set_site,*args,**kwargs):
 		self.filtered_queryset = queryset
 		super(DisplaySet,self).__init__(queryset.model,display_set_site)
@@ -113,9 +114,7 @@ class DisplaySet(adminoptions.ModelAdmin):
 		from django.contrib.admin.options import IncorrectLookupParameters
 		opts = self.model._meta
 		app_label = opts.app_label
-		if not self.has_change_permission(request, None):
-			raise PermissionDenied()
-
+		
 		# Check actions to see if any are available on this changelist
 		actions = self.get_actions(request)
 
@@ -220,3 +219,4 @@ class DisplaySet(adminoptions.ModelAdmin):
 			'admin/change_list.html'
 		], context, context_instance=context_instance)
 	
+
