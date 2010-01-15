@@ -3,6 +3,7 @@ import operator
 from django.core.exceptions import PermissionDenied
 from django.contrib.admin.views.main import ChangeList
 from django.contrib.admin import options as adminoptions
+from django.core.paginator import Paginator, InvalidPage
 from django.http import HttpResponseRedirect
 from django.shortcuts import render_to_response
 from django.template import RequestContext
@@ -27,10 +28,45 @@ def generic(request,queryset,display_class,extra_context=None,display_site=Defau
 
 ORDER_VAR = 'o'
 ORDER_TYPE_VAR = 'ot'
+MAX_SHOW_ALL = 1000
 class DisplayList(ChangeList):
 	def __init__(self,queryset,request,*args,**kwargs):
 		self.filtered_queryset = queryset
 		super(DisplayList,self).__init__(request,*args,**kwargs)
+
+	def get_results(self, request):
+		paginator = Paginator(self.query_set, self.list_per_page)
+		# Get the number of objects, with admin filters applied.
+		result_count = paginator.count
+
+		# Get the total number of objects, with no admin filters applied.
+		# Perform a slight optimization: Check to see whether any filters were
+		# given. If not, use paginator.hits to calculate the number of objects,
+		# because we've already done paginator.hits and the value is cached.
+		if not self.query_set.query.where:
+			full_result_count = result_count
+		else:
+			full_result_count = self.root_query_set.count()
+
+		can_show_all = MAX_SHOW_ALL #<<<<
+		multi_page = result_count > self.list_per_page
+
+		# Get the list of objects to display on this page.
+		if (self.show_all and can_show_all) or not multi_page:
+			result_list = self.query_set._clone()
+		else:
+			try:
+				result_list = paginator.page(self.page_num+1).object_list
+			except InvalidPage:
+				result_list = ()
+
+		self.result_count = result_count
+		self.full_result_count = full_result_count
+		self.result_list = result_list
+		self.can_show_all = can_show_all
+		self.multi_page = multi_page
+		self.paginator = paginator
+
 
 	def get_ordering(self):
 		lookup_opts, params = self.lookup_opts, self.params
@@ -61,7 +97,7 @@ class DisplayList(ChangeList):
 							attr = getattr(self.model, field_name)
 						order_field = attr.admin_order_field
 					except AttributeError:
-						if field_name in self.filtered_queryset.query.aggregates or field_name in self.filtered_queryset.query.extra: #****
+						if field_name in self.filtered_queryset.query.aggregates or field_name in self.filtered_queryset.query.extra: #<<<<
 							order_field = field_name
 				else:
 					order_field = f.name
