@@ -1,7 +1,7 @@
 """
 ** Usage
 
-This is barely different from django-admin's ModelAdmin.
+This is barely different from django.contrib.admin's ModelAdmin.
 
 Think of it as the pretty way to display queryset just like in django-admin.
 
