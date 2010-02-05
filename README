@@ -1,0 +1,28 @@
+"""
+** Usage
+
+This is barely different from django.contrib.admin's ModelAdmin.
+
+Think of it as the pretty way to display querysets just like in django-admin.
+
+views.py: 
+
+class CustomerDisplaySet(displayset_views.DisplaySet):
+    list_display = (customer,last_contacted,phone_number,is_open)
+    ordering = ('-date_added','last_name')
+    search_fields = ('last_name','first_name','file','address__phone_primary','address__zip','address__line_1','address__line_2')
+    actions = (merge_selected,)
+    change_list_template = "report_no_filter.html"
+
+
+def browse(request,displayset=CustomerDisplaySet,queryset=None,extra_params=None):
+    if not queryset:
+        queryset = cmodels.Customer.objects.select_related('address')
+
+    filter = cforms.BrowseFilterSet(request.user,request.GET or None,queryset=queryset)
+    results = filter.qs.annotate(last_contact_date=Max('contact__date'))
+
+    return displayset_views.generic(request,results,displayset,\
+            extra_context={'filter': filter })
+
+"""
