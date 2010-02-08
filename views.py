@@ -7,6 +7,7 @@ from django.core.paginator import Paginator, InvalidPage
 from django.http import HttpResponseRedirect
 from django.shortcuts import render_to_response
 from django.template import RequestContext
+from django.utils.http import urlencode
 from django.db.models import Q
 from django.db import models
 
@@ -33,6 +34,34 @@ class DisplayList(ChangeList):
 	def __init__(self,queryset,request,*args,**kwargs):
 		self.filtered_queryset = queryset
 		super(DisplayList,self).__init__(request,*args,**kwargs)
+		self.params = dict(request.GET.lists()) #<<<<
+
+	def get_query_string(self, new_params=None, remove=None):
+		if new_params is None: new_params = {}
+		if remove is None: remove = []
+		final_params = []
+		p = self.params.copy()
+		for r in remove:
+			for k in p.keys():
+				if k.startswith(r):
+					del p[k]
+		for k, v in new_params.items():
+			if v is None:
+				if k in p:
+					del p[k]
+			else:
+				p[k] = v
+		#<<<<
+		for k,v in p.items():
+			if isinstance(v, (list,tuple)): 
+				if len(v) == 1:
+					final_params.append((k,v[0]))
+				else:
+					final_params.extend([(k, list_value) for list_value in v])
+			else:
+				final_params.append((k,v))
+		#<<<<
+		return '?%s' % urlencode(final_params)
 
 	def get_results(self, request):
 		paginator = Paginator(self.query_set, self.list_per_page)
