@@ -34,13 +34,13 @@ class DisplayList(ChangeList):
 	def __init__(self,queryset,request,*args,**kwargs):
 		self.filtered_queryset = queryset
 		super(DisplayList,self).__init__(request,*args,**kwargs)
-		self.params = dict(request.GET.lists()) #<<<<
+		self.multiple_params_safe = dict(request.GET.lists()) #<<<<
 
 	def get_query_string(self, new_params=None, remove=None):
 		if new_params is None: new_params = {}
 		if remove is None: remove = []
 		final_params = []
-		p = self.params.copy()
+		p = self.multiple_params_safe.copy() #<<<<
 		for r in remove:
 			for k in p.keys():
 				if k.startswith(r):
