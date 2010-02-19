@@ -328,17 +328,18 @@ class DisplaySet(adminoptions.ModelAdmin):
 
 			### We change the default action of returning none as if we want to try returning all <<<<
 			"""
-			selected = request.POST.getlist(helpers.ACTION_CHECKBOX_NAME)
 			if not selected and not select_across:
 				# Reminder that something needs to be selected or nothing will happen
 				msg = _("Items must be selected in order to perform actions on them. No items have been changed.")
 				self.message_user(request, msg)
 				return None
 
-			if not select_across:
+			"""
+			selected = request.POST.getlist(helpers.ACTION_CHECKBOX_NAME)
+			if not select_across and selected:
 				# Perform the action only on the selected objects
 				queryset = queryset.filter(pk__in=selected)
-			"""
+
 			response = func(self, request, queryset)
 
 			# Actions may return an HttpResponse, which will be used as the
