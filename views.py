@@ -350,5 +350,5 @@ class DisplaySet(adminoptions.ModelAdmin):
 			else:
 				return HttpResponseRedirect(".")
 		else:
-			msg = _("No action selected.")
+			msg = "No action selected."
 			self.message_user(request, msg)
