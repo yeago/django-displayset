@@ -1,4 +1,5 @@
 import operator
+import csv
 
 from django.core.exceptions import PermissionDenied
 from django.contrib.admin.views.main import ChangeList
@@ -28,15 +29,22 @@ class DefaultDisplaySite(object):
 def generic(request,queryset,display_class,extra_context=None,display_site=DefaultDisplaySite):
 	return display_class(queryset,display_site).changelist_view(request,extra_context)
 
+def list_replace(replacements, original): # replacements are [(index,function),(index,function),...]
+	for item in replacements: # item is (index, function)
+		original.pop(item[0])
+		original.insert(item[0],item[1])
+	return original
+
 ORDER_VAR = 'o'
 ORDER_TYPE_VAR = 'ot'
 MAX_SHOW_ALL = 1000
 class DisplayList(ChangeList):
+
 	def __init__(self,queryset,request,*args,**kwargs):
 		self.filtered_queryset = queryset
 		super(DisplayList,self).__init__(request,*args,**kwargs)
 		self.multiple_params_safe = dict(request.GET.lists()) #<<<<
-
+	
 	def get_query_string(self, new_params=None, remove=None):
 		if new_params is None: new_params = {}
 		if remove is None: remove = []
@@ -163,13 +171,75 @@ class DisplayList(ChangeList):
 					break
 
 		return self.filtered_queryset
-		
-class DisplaySet(adminoptions.ModelAdmin):
-	change_list_template = 'displayset/base.html'
 
+class DisplaySet(adminoptions.ModelAdmin):
+	#<<<<
+	change_list_template = 'displayset/base.html'
+	use_get_absolute_url = [] 
+	default_list_display = [] 
+	auto_redirect = False
+	auto_redirect_url = None
+	export = False
+	export_name = None
+	#<<<<
+
+	#<<<<
 	def __init__(self,queryset,display_set_site,*args,**kwargs):
 		self.filtered_queryset = queryset
 		super(DisplaySet,self).__init__(queryset.model,display_set_site)
+		self.default_list_display = self.handle_default_display() 
+		self.list_display = self.handle_list_display()
+		self.add_action_export()		
+	#<<<<
+		
+	#<<<<
+	def handle_default_display(self):
+		replace_list = []
+		for x,f in enumerate(self.default_list_display):
+			func = self.get_absolute_urlify(f)
+			if func:
+				replace_list.append((x,func))
+		return list_replace(replace_list,self.default_list_display)
+
+	def handle_list_display(self):
+		replace_list = []
+		for x,f in enumerate(self.list_display):
+			func = self.get_absolute_urlify(f)
+			if func:
+				replace_list.append((x,func))
+
+		self.list_display = self.prepend_default_display()
+		return list_replace(replace_list,self.list_display)
+	
+	def prepend_default_display(self):
+		list_display = self.list_display[:]
+		for f in reversed(self.default_list_display):
+			list_display.insert(1,f) # action checkbox is in the first slot
+		return list_display
+
+	def get_absolute_urlify(self,field):
+		func = None
+		if field in self.use_get_absolute_url:
+			func = lambda obj: "<a href='%s'>%s</a>" % (obj.get_absolute_url(), getattr(obj,func.field)) # or func.field
+			func.admin_order_field = field
+			func.short_description = field
+		elif callable(field) and field.__name__ in self.use_get_absolute_url:
+			func = lambda obj: "<a href='%s'>%s</a>" % (obj.get_absolute_url, func.field(obj)) # or func.field(obj)
+			try:
+				func.admin_order_field = field.admin_order_field
+			except AttributeError:
+				func.admin_order_field = None
+			try:
+				func.short_description = field.short_description
+			except AttributeError:
+				func.short_description = field.__name__
+		
+		if func:
+			func.allow_tags = True
+			func.field = field
+			return func
+		return None
+	#<<<<
 	
 	def queryset(self, request):
 		return self.filtered_queryset
@@ -204,6 +274,18 @@ class DisplaySet(adminoptions.ModelAdmin):
 			if ERROR_FLAG in request.GET.keys():
 				return render_to_response('admin/invalid_setup.html', {'title': 'Database error'})
 			return HttpResponseRedirect(request.path + '?' + ERROR_FLAG + '=1')
+
+		#<<<<
+		# if auto_redirect is true we should handle that before anything else
+		if self.auto_redirect and cl.query_set.count() == 1:
+			obj = self.filtered_queryset[0]
+			try:
+				url = obj.get_absolute_url()
+			except AttributeError:
+				url = None
+			if url: # if no url just go ahead and show the display set normally
+				return HttpResponseRedirect(url)
+		#<<<<
 
 		# If the request was POSTed, this might be a bulk action or a bulk edit.
 		# Try to look up an action first, but if this isn't an action the POST
@@ -352,3 +434,51 @@ class DisplaySet(adminoptions.ModelAdmin):
 		else:
 			msg = "No action selected."
 			self.message_user(request, msg)
+
+	#<<<<
+	# How to add csv export to your own display set
+	# class DisplaySetSubclass(DisplaySet):
+	#	export = True
+	#	export_name = "display_report" ####makes the file name display_report.csv
+
+	def add_action_export(self):
+		if self.export == True:
+			self.actions.append(self.csv_export)
+
+	def csv_export(self, modeladmin, request, queryset):
+		import re
+		html_re = re.compile("<.*>(.*)</.*>")
+		response = HttpResponse(mimetype='text/csv')
+		response['Content-Disposition'] = 'attachment; filename=%s.csv' % (self.export_name or queryset.model)
+		writer = csv.writer(response)
+		fields = []
+		header = []
+		for f in modeladmin.list_display:
+			if f != 'action_checkbox':
+				if callable(f):
+					fields.append(f)
+					try:
+						header.append(f.short_description)
+					except AttributeError:
+						header.append(f.__name__)
+					continue
+				fields.append(f);header.append(f)
+		writer.writerow(header)
+		for obj in queryset:
+			row = []
+			for f in fields:
+				if f != 'action_checkbox':
+					if callable(f):
+						text = f(obj)
+						try:
+							text = html_re.search(text).groups()[0]
+							row.append(text)
+						except (TypeError,AttributeError): # either we got something like a datetime or no match was found (no html, so its clean)
+							row.append(text)
+						continue
+					row.append(getattr(obj, f))
+			writer.writerow(row)
+		return response
+	csv_export.short_description = "Export to CSV"
+	#<<<<
+
