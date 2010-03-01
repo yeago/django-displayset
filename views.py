@@ -214,7 +214,9 @@ class DisplaySet(adminoptions.ModelAdmin):
 	def prepend_default_display(self):
 		list_display = self.list_display[:]
 		for f in reversed(self.default_list_display):
-			list_display.insert(1,f) # action checkbox is in the first slot
+			if list_display[0] == 'action_checkbox': 
+				list_display.insert(1,f) # action checkbox is in the first slot
+			else: list_display.insert(0,f)
 		return list_display
 
 	def get_absolute_urlify(self,field):
