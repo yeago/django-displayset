@@ -280,7 +280,7 @@ class DisplaySet(adminoptions.ModelAdmin):
 		#<<<<
 		# if auto_redirect is true we should handle that before anything else
 		if self.auto_redirect and cl.query_set.count() == 1:
-			obj = self.filtered_queryset[0]
+			obj = cl.query_set[0]
 			try:
 				url = obj.get_absolute_url()
 			except AttributeError:
