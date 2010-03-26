@@ -481,6 +481,6 @@ class DisplaySet(adminoptions.ModelAdmin):
 					row.append(getattr(obj, f))
 			writer.writerow(row)
 		return response
-	csv_export.short_description = "Export to CSV"
+	csv_export.short_description = "Export to Excel"
 	#<<<<
 
