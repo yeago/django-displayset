@@ -39,7 +39,6 @@ ORDER_VAR = 'o'
 ORDER_TYPE_VAR = 'ot'
 MAX_SHOW_ALL = 1000
 class DisplayList(ChangeList):
-
 	def __init__(self,queryset,request,*args,**kwargs):
 		self.filtered_queryset = queryset
 		super(DisplayList,self).__init__(request,*args,**kwargs)
