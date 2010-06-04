@@ -16,8 +16,6 @@ from django.db import models
 from django.contrib.admin import helpers
 from django import template
 
-from django_displayset import forms as dsforms
-
 class DefaultDisplaySite(object):
 	actions = []
 	root_path = '/'
