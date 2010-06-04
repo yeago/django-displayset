@@ -157,6 +157,46 @@ class DisplayList(ChangeList):
 		return self.filtered_queryset
 
 	#<<<<
+
+	def get_results(self, request):
+		paginator = Paginator(self.query_set, self.list_per_page)
+		# Get the number of objects, with admin filters applied.
+		result_count = paginator.count
+
+		# Get the total number of objects, with no admin filters applied.
+		# Perform a slight optimization: Check to see whether any filters were
+		# given. If not, use paginator.hits to calculate the number of objects,
+		# because we've already done paginator.hits and the value is cached.
+		if not self.query_set.query.where:
+			full_result_count = result_count
+		else:
+			#<<<<
+
+			#Temporary fix... we are going to patch this...
+			#The template has also been temp fixed to not show this number
+			full_result_count = -1#self.root_query_set.count()
+
+			#<<<
+
+		can_show_all = MAX_SHOW_ALL #<<<<
+		multi_page = result_count > self.list_per_page
+
+		# Get the list of objects to display on this page.
+		if (self.show_all and can_show_all) or not multi_page:
+			result_list = self.query_set._clone()
+		else:
+			try:
+				result_list = paginator.page(self.page_num+1).object_list
+			except InvalidPage:
+				result_list = ()
+
+		self.result_count = result_count
+		self.full_result_count = full_result_count
+		self.result_list = result_list
+		self.can_show_all = can_show_all
+		self.multi_page = multi_page
+		self.paginator = paginator
+
 	def handle_default_display(self):
 		replace_list = []
 		for x,f in enumerate(self.model_admin.default_list_display):
