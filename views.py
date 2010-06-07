@@ -258,6 +258,8 @@ class DisplaySet(adminoptions.ModelAdmin):
 		self.filtered_queryset = queryset
 		if self.export:
 			self.actions.append(csv_export)
+		if self.list_display != None:
+			self.list_display = list(self.list_display)
 		super(DisplaySet,self).__init__(queryset.model,display_set_site)
 
 	def get_changelist(self,request):
