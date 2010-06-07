@@ -341,8 +341,6 @@ class DisplaySet(adminoptions.ModelAdmin):
 		from django.contrib.admin.views.main import ERROR_FLAG
 		opts = self.model._meta
 		app_label = opts.app_label
-		if not self.has_change_permission(request, None):
-			raise PermissionDenied
 
 		# Check actions to see if any are available on this changelist
 		actions = self.get_actions(request)
