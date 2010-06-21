@@ -92,6 +92,9 @@ class DisplayList(ChangeList):
 		self.multiple_params_safe = dict(request.GET.lists())
 		self.model_admin.default_list_display = self.handle_default_display() 
 		self.list_display = self.handle_list_display()
+		self.order_field, self.order_type = self.get_ordering()
+		self.query_set = self.get_query_set()
+		self.get_results(request)
 		if not self.model_admin.actions:
 			try:
 				self.list_display.remove('action_checkbox')
@@ -226,7 +229,7 @@ class DisplayList(ChangeList):
 		if field in self.model_admin.use_get_absolute_url:
 			func = lambda obj: "<a href='%s'>%s</a>" % (obj.get_absolute_url(), getattr(obj,func.field)) # or func.field
 			func.admin_order_field = field
-			func.short_description = field
+			func.short_description = field.replace('_',' ')
 		elif callable(field) and field.__name__ in self.model_admin.use_get_absolute_url:
 			func = lambda obj: "<a href='%s'>%s</a>" % (obj.get_absolute_url, func.field(obj)) # or func.field(obj)
 			try:
