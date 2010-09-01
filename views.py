@@ -42,7 +42,7 @@ def filterset_generic(request,filter,display_class,queryset=None,extra_context=N
 	"""
 	queryset = queryset or filter.qs
 	extra_context = extra_context or {}
-	display = display_class(filter.qs,display_site)
+	display = display_class(queryset,display_site)
 
 	if hasattr(filter,'get_parameters'):
 		params = filter.get_parameters()
@@ -87,10 +87,12 @@ def filterset_generic(request,filter,display_class,queryset=None,extra_context=N
 			del updated_params[range_item[0]-i*2]
 			del updated_params[range_item[1]-i*2-1]
 
-	if 'report_header' not in extra_context:
-		extra_context['report_header'] = [] 
+	if updated_params:
+		if not extra_context.get('report_header'):
+			extra_context['report_header'] = [] 
 
-	extra_context['report_header'].extend(updated_params)
+		extra_context['report_header'].extend(updated_params)
+
 	return display.changelist_view(request,extra_context)
 
 def list_replace(replacements, original): # replacements are [(index,function),(index,function),...]
