@@ -4,21 +4,25 @@
 
 {% block filters %}
 {% if filter.form.fields %}
-<div id="changelist-filter">
-<form action="." method="get" class="side_form">
-	<fieldset>
-		{% for field in filter.form %}
-		<div>
-			{{ field.label_tag }}
-			{{ field }}
-			{{ field.errors }}
-		</div>
-		{% endfor %}
-		<div>
-			<input class="submit" type="submit" name="submit" value="Run Report" />
-		</div>
-	</fieldset>
-</form>
+<div id="filters">
+	<div id="changelist-filter">
+	<form action="." method="get">
+		<fieldset>
+			{% for field in filter.form %}
+			<div>
+				<span>
+				{{ field.label_tag }}
+				{{ field }}
+				{{ field.errors }}
+				</span>
+			</div>
+			{% endfor %}
+			<div>
+				<input class="submit" type="submit" name="submit" value="Run Report" />
+			</div>
+		</fieldset>
+	</form>
+	</div>
 </div>
 {% endif %}
 {% endblock %}

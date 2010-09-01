@@ -272,7 +272,7 @@ class DisplayList(ChangeList):
 	def prepend_default_display(self):
 		list_display = self.model_admin.list_display[:]
 		for f in reversed(self.model_admin.default_list_display):
-			if list_display[0] == 'action_checkbox': 
+			if 'action_checkbox' in list_display: 
 				list_display.insert(1,f) # action checkbox is in the first slot
 			else: list_display.insert(0,f)
 		return list_display
@@ -316,7 +316,11 @@ class DisplaySet(adminoptions.ModelAdmin):
 			self.actions.append(csv_export)
 		if self.list_display != None:
 			self.list_display = list(self.list_display)
+
 		super(DisplaySet,self).__init__(queryset.model,display_set_site)
+
+		if not self.actions and 'action_checkbox' in self.list_display:
+			self.list_display.remove('action_checkbox')
 
 	def get_changelist(self,request):
 		DisplayList.filtered_queryset = self.filtered_queryset
