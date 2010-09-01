@@ -33,12 +33,71 @@ def generic(request,queryset,display_class,extra_context=None,display_site=Defau
 	display = display_class(queryset,display_site)
 	return display.changelist_view(request,extra_context)
 
+def filterset_generic(request,filter,display_class,queryset=None,extra_context=None,display_site=DefaultDisplaySite):
+	"""
+	In this situation, we're using the FilterSet which has the convenience get_parameters()
+	which gives us a nicely formatted result of what is being queried upon.
+
+	It supplies extra context which can be used to create a table report_header in the template
+	"""
+	queryset = queryset or filter.qs
+	extra_context = extra_context or {}
+	display = display_class(filter.qs,display_site)
+
+	if hasattr(filter,'get_parameters'):
+		params = filter.get_parameters()
+
+	else:
+		params =  []
+		
+	form = filter.form
+
+	updated_params = []
+	for p in params:
+		field, value = p
+		new_value = value
+		if form and field in form.fields:
+			#If not a list, make it a list:
+			if not isinstance(value,list):
+				value = [value]
+			if getattr(form.fields[field],'queryset',None):
+				new_value = ', '.join([unicode(o) for o in form.fields[field].queryset.filter(pk__in=value)])
+			elif getattr(form.fields[field],'choices', None):
+				new_value = ', '.join([c[1] for c in form.fields[field].choices if c[1] in value])
+
+		updated_params.append((field,new_value))
+
+	if params:
+		#Here, we gather all the range fields and display them as one parameter
+		range_list = []
+		#First, compare the names to see which fields belong together
+		for i,p in enumerate(updated_params):
+			param_name = p[0][:-1]
+			for j in range(i+1,len(updated_params)-1):
+				if updated_params[j][0][:-1] == param_name:
+					range_list.append((i,j))
+		#Second, append the new range values to the updated_parameters
+		for range_item in range_list:
+			field = updated_params[range_item[0]][0][:-2]
+			end_value = updated_params[range_item[1]][1][0]
+			start_value = updated_params[range_item[0]][1][0]
+			updated_params.append((field,"%s - %s" % (start_value, end_value)))
+		#Last, Remove the old parameters from updated_parameters
+		for i,range_item in enumerate(range_list):
+			del updated_params[range_item[0]-i*2]
+			del updated_params[range_item[1]-i*2-1]
+
+	if 'report_header' not in extra_context:
+		extra_context['report_header'] = [] 
+
+	extra_context['report_header'].extend(updated_params)
+	return display.changelist_view(request,extra_context)
+
 def list_replace(replacements, original): # replacements are [(index,function),(index,function),...]
 	for item in replacements: # item is (index, function)
 		original.pop(item[0])
 		original.insert(item[0],item[1])
 	return original
-
 
 # How to add csv export to your own display set
 # class DisplaySetSubclass(DisplaySet):
@@ -79,14 +138,11 @@ def csv_export(modeladmin, request, queryset):
 		writer.writerow(row)
 	return response
 csv_export.short_description = "Export to Excel"
-#<<<<
 
 ORDER_VAR = 'o'
 ORDER_TYPE_VAR = 'ot'
 MAX_SHOW_ALL = 1000
 class DisplayList(ChangeList):
-
-	#<<<<
 	def __init__(self,request,*args,**kwargs):
 		super(DisplayList,self).__init__(request,*args,**kwargs)
 		self.multiple_params_safe = dict(request.GET.lists())
@@ -100,14 +156,12 @@ class DisplayList(ChangeList):
 				self.list_display.remove('action_checkbox')
 			except ValueError:
 				pass
-		
-	#<<<<
 	
 	def get_query_string(self, new_params=None, remove=None):
 		if new_params is None: new_params = {}
 		if remove is None: remove = []
 		final_params = []
-		p = self.multiple_params_safe.copy() #<<<<
+		p = self.multiple_params_safe.copy()
 		for r in remove:
 			for k in p.keys():
 				if k.startswith(r):
@@ -118,7 +172,6 @@ class DisplayList(ChangeList):
 					del p[k]
 			else:
 				p[k] = v
-		#<<<<
 		for k,v in p.items():
 			if isinstance(v, (list,tuple)): 
 				if len(v) == 1:
