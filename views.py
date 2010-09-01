@@ -59,9 +59,11 @@ def filterset_generic(request,filter,display_class,queryset=None,extra_context=N
 		if form and field in form.fields:
 			#If not a list, make it a list:
 			if not isinstance(value,list):
-				value = [value]
+				value = value
+				
 			if getattr(form.fields[field],'queryset',None):
 				new_value = ', '.join([unicode(o) for o in form.fields[field].queryset.filter(pk__in=value)])
+				
 			elif getattr(form.fields[field],'choices', None):
 				new_value = ', '.join([c[1] for c in form.fields[field].choices if c[1] in value])
 
@@ -92,6 +94,8 @@ def filterset_generic(request,filter,display_class,queryset=None,extra_context=N
 			extra_context['report_header'] = [] 
 
 		extra_context['report_header'].extend(updated_params)
+
+	extra_context.update({'filter': filter})
 
 	return display.changelist_view(request,extra_context)
 
