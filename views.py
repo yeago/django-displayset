@@ -55,7 +55,10 @@ def filterset_generic(request,filter,display_class,queryset=None,extra_context=N
 	for p in params:
 		field, value = p
 		new_value = value
-		if form and field in form.fields:
+
+		if hasattr(display,"parameter_fields") and display.parameter_fields.get(field,None):
+			new_value = display.parameter_fields.get(field)(form,field,value)
+		elif form and field in form.fields:
 			#If not a list, make it a list:
 			if not isinstance(value,list):
 				value = value
@@ -66,7 +69,8 @@ def filterset_generic(request,filter,display_class,queryset=None,extra_context=N
 			elif getattr(form.fields[field],'choices', None):
 				new_value = ', '.join([c[1] for c in form.fields[field].choices if c[0] in value])
 
-		updated_params.append((field,new_value))
+		if new_value is not None:
+			updated_params.append((field,new_value))
 
 	if params:
 		#Here, we gather all the range fields and display them as one parameter
