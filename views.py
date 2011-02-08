@@ -19,8 +19,8 @@ from django import template
 class DefaultDisplaySite(object):
 	actions = []
 	root_path = '/'
-	name = 'Default DisplaySet Site' 
-	
+	name = 'Default DisplaySet Site'
+
 	def admin_view(self,view):
 		def no_wrap(request,*args,**kwargs):
 			return view(request,*args,**kwargs)
@@ -46,10 +46,9 @@ def filterset_generic(request,filter,display_class,queryset=None,extra_context=N
 
 	if hasattr(filter,'get_parameters'):
 		params = filter.get_parameters()
-
 	else:
 		params =  []
-		
+
 	form = filter.form
 
 	updated_params = []
@@ -60,12 +59,12 @@ def filterset_generic(request,filter,display_class,queryset=None,extra_context=N
 			#If not a list, make it a list:
 			if not isinstance(value,list):
 				value = value
-				
+
 			if getattr(form.fields[field],'queryset',None):
 				new_value = ', '.join([unicode(o) for o in form.fields[field].queryset.filter(pk__in=value)])
-				
+
 			elif getattr(form.fields[field],'choices', None):
-				new_value = ', '.join([c[1] for c in form.fields[field].choices if c[1] in value])
+				new_value = ', '.join([c[1] for c in form.fields[field].choices if c[0] in value])
 
 		updated_params.append((field,new_value))
 
@@ -91,7 +90,7 @@ def filterset_generic(request,filter,display_class,queryset=None,extra_context=N
 
 	if updated_params:
 		if not extra_context.get('report_header'):
-			extra_context['report_header'] = [] 
+			extra_context['report_header'] = []
 
 		extra_context['report_header'].extend(updated_params)
 
@@ -152,7 +151,7 @@ class DisplayList(ChangeList):
 	def __init__(self,request,*args,**kwargs):
 		super(DisplayList,self).__init__(request,*args,**kwargs)
 		self.multiple_params_safe = dict(request.GET.lists())
-		self.model_admin.default_list_display = self.handle_default_display() 
+		self.model_admin.default_list_display = self.handle_default_display()
 		self.list_display = self.handle_list_display()
 		self.order_field, self.order_type = self.get_ordering()
 		self.query_set = self.get_query_set()
@@ -162,7 +161,7 @@ class DisplayList(ChangeList):
 				self.list_display.remove('action_checkbox')
 			except ValueError:
 				pass
-	
+
 	def get_query_string(self, new_params=None, remove=None):
 		if new_params is None: new_params = {}
 		if remove is None: remove = []
@@ -179,7 +178,7 @@ class DisplayList(ChangeList):
 			else:
 				p[k] = v
 		for k,v in p.items():
-			if isinstance(v, (list,tuple)): 
+			if isinstance(v, (list,tuple)):
 				if len(v) == 1:
 					final_params.append((k,v[0]))
 				else:
@@ -274,11 +273,11 @@ class DisplayList(ChangeList):
 
 		self.model_admin.list_display = self.prepend_default_display()
 		return list_replace(replace_list,self.model_admin.list_display)
-	
+
 	def prepend_default_display(self):
 		list_display = self.model_admin.list_display[:]
 		for f in reversed(self.model_admin.default_list_display):
-			if 'action_checkbox' in list_display: 
+			if 'action_checkbox' in list_display:
 				list_display.insert(1,f) # action checkbox is in the first slot
 			else: list_display.insert(0,f)
 		return list_display
@@ -299,7 +298,7 @@ class DisplayList(ChangeList):
 				func.short_description = field.short_description
 			except AttributeError:
 				func.short_description = field.__name__
-		
+
 		if func:
 			func.allow_tags = True
 			func.field = field
@@ -309,8 +308,8 @@ class DisplayList(ChangeList):
 class DisplaySet(adminoptions.ModelAdmin):
 	#<<<<
 	change_list_template = 'displayset/base.html'
-	use_get_absolute_url = [] 
-	default_list_display = [] 
+	use_get_absolute_url = []
+	default_list_display = []
 	auto_redirect = False
 	auto_redirect_url = None
 	export = False
@@ -331,7 +330,7 @@ class DisplaySet(adminoptions.ModelAdmin):
 	def get_changelist(self,request):
 		DisplayList.filtered_queryset = self.filtered_queryset
 		return DisplayList
-		
+
 	def queryset(self, request):
 		return self.filtered_queryset
 	#<<<<
