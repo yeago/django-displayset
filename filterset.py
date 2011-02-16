@@ -1,4 +1,8 @@
-import django_filters
+try: 
+	import django_qfilters as django_filters
+	# See https://github.com/subsume/django_qfilters
+except ImportError:
+	import django_filters
 
 class ParameterFilterSet(django_filters.FilterSet):
 	def get_parameters(self):
