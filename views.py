@@ -16,6 +16,28 @@ from django.db import models
 from django.contrib.admin import helpers
 from django import template
 
+def cap_first(string):
+	#This works exactly like string.title(), except it does not remove interior capitalization.
+	if string:
+		if string == None or string == "":
+			return string
+		string = "%s%s" % (string[0].upper(), string[1:])
+		seperators = (" ", "-", "_", "/", "\\",)
+		for i, char in enumerate(string):
+			if char in seperators and i+1 < len(string):
+				string = "%s%s%s" % (string[0:i+1], string[i+1].upper(), string[i+2:])
+		return string
+	return None
+def pretty(string):
+	if string:
+		if string[0] == "_":
+			string = "%s%s" % (" ", string[1:])
+		for i, char in enumerate(string):
+			if char == "_":
+				string = "%s%s%s" % (string[0:i], " ", string[i+1:])
+		return cap_first(string.strip())
+	return None
+
 class DefaultDisplaySite(object):
 	actions = []
 	root_path = '/'
@@ -55,38 +77,44 @@ def filterset_generic(request,filter,display_class,queryset=None,extra_context=N
 	for p in params:
 		field, value = p
 		new_value = value
-		if form and field in form.fields:
-			#If not a list, make it a list:
-			if not isinstance(value,list):
-				value = value
+
+		if hasattr(display,"parameter_fields") and display.parameter_fields.get(field,None):
+			new_value = display.parameter_fields.get(field)(form,field,value)
+		elif form and field in form.fields:
 
 			if getattr(form.fields[field],'queryset',None):
 				new_value = ', '.join([unicode(o) for o in form.fields[field].queryset.filter(pk__in=value)])
-
 			elif getattr(form.fields[field],'choices', None):
-				new_value = ', '.join([c[1] for c in form.fields[field].choices if c[0] in value])
+				new_value = ', '.join([unicode(c[1]) for c in form.fields[field].choices if unicode(c[0]) in value])
+			else:
+				new_value = ', '.join(new_value)
 
-		updated_params.append((field,new_value))
+		if new_value is not None:
+			updated_params.append((pretty(field),new_value))
 
 	if params:
 		#Here, we gather all the range fields and display them as one parameter
-		range_list = []
+		range_dict = {}
 		#First, compare the names to see which fields belong together
 		for i,p in enumerate(updated_params):
 			param_name = p[0][:-1]
 			for j in range(i+1,len(updated_params)-1):
-				if updated_params[j][0][:-1] == param_name:
-					range_list.append((i,j))
-		#Second, append the new range values to the updated_parameters
-		for range_item in range_list:
-			field = updated_params[range_item[0]][0][:-2]
-			end_value = updated_params[range_item[1]][1][0]
-			start_value = updated_params[range_item[0]][1][0]
-			updated_params.append((field,"%s - %s" % (start_value, end_value)))
-		#Last, Remove the old parameters from updated_parameters
-		for i,range_item in enumerate(range_list):
-			del updated_params[range_item[0]-i*2]
-			del updated_params[range_item[1]-i*2-1]
+				param_name_check = updated_params[j][0][:-1]
+				if param_name == param_name_check:
+					if not range_dict.get(param_name,None):
+						range_dict[param_name] = [i]
+					if j not in range_dict[param_name]:
+						range_dict[param_name].append(j)
+		# Append the new range values to the updated_parameters
+		for field,values in range_dict.items():
+			field_name = field[:-1]
+			field_values = ' - '.join([updated_params[v][1][0] for v in values])
+			updated_params.append((field_name,field_values))
+		# Remove the old parameters from updated_parameters
+		remove_indices = []
+		[remove_indices.extend(v) for v in range_dict.values()]
+		for i, index in enumerate(sorted(remove_indices)):
+			del updated_params[index-i]
 
 	if updated_params:
 		if not extra_context.get('report_header'):
