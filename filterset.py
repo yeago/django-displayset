@@ -1,4 +1,4 @@
-try: 
+try:
 	import django_qfilters as django_filters
 	# See https://github.com/subsume/django_qfilters
 except ImportError:
