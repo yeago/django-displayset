@@ -1,6 +1,5 @@
-try: 
-	import django_qfilters as project_filters
-	# See https://github.com/subsume/django_qfilters
+try:
+	import django_qfilters as django_filters
 except ImportError:
 	import django_filters as project_filters
 

@@ -42,6 +42,7 @@ class DefaultDisplaySite(object):
 	actions = []
 	root_path = '/'
 	name = 'Default DisplaySet Site'
+	_registry = {}
 
 	def admin_view(self,view):
 		def no_wrap(request,*args,**kwargs):
