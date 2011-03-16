@@ -1,5 +1,5 @@
 try:
-	import django_qfilters as django_filters
+	import django_qfilters as project_filters
 except ImportError:
 	import django_filters as project_filters
 
