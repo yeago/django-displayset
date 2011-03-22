@@ -168,7 +168,11 @@ def csv_export(modeladmin, request, queryset):
 					except (TypeError,AttributeError): # either we got something like a datetime or no match was found (no html, so its clean)
 						row.append(text)
 					continue
-				row.append(getattr(obj, f))
+				try:
+					attr = getattr(obj, f)
+				except AttributeError:
+					attr = "(None)"
+				row.append(attr)
 		writer.writerow(row)
 	return response
 csv_export.short_description = "Export to Excel"
