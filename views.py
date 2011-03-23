@@ -141,7 +141,7 @@ def csv_export(modeladmin, request, queryset):
 	import re
 	html_re = re.compile("<.*>(.*)</.*>")
 	response = HttpResponse(mimetype='text/csv')
-	response['Content-Disposition'] = 'attachment; filename=%s.csv' % (modeladmin.export_name or queryset.model)
+	response['Content-Disposition'] = 'attachment; filename=%s.csv' % (modeladmin.export_name or queryset.model._meta.verbose_name)
 	writer = csv.writer(response)
 	fields = []
 	header = []
