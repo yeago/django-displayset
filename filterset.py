@@ -1,10 +1,9 @@
 try:
-	import django_qfilters as django_filters
-	# See https://github.com/subsume/django_qfilters
+	import django_qfilters as project_filters
 except ImportError:
-	import django_filters
+	import django_filters as project_filters
 
-class ParameterFilterSet(django_filters.FilterSet):
+class ParameterFilterSet(project_filters.FilterSet):
 	def get_parameters(self):
 		parameters = []
 		skip_list = ['submit', 'q', 'o', 'ot', 'p']
@@ -16,4 +15,3 @@ class ParameterFilterSet(django_filters.FilterSet):
 
 		parameters = sorted(parameters)
 		return parameters
-
