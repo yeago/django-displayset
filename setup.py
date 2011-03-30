@@ -8,7 +8,7 @@ setup(
     author='Steve Yeago',
     author_email='subsume@gmail.com',
     description='Admin-like display of querysets in django',
-    url='http://github.com/subsume/django-slugify',
+    url='http://github.com/subsume/django-displayset',
     packages=find_packages(),
     include_package_data=True,
     classifiers=[
