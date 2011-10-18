@@ -181,6 +181,7 @@ ORDER_VAR = 'o'
 ORDER_TYPE_VAR = 'ot'
 MAX_SHOW_ALL = 1000
 class DisplayList(ChangeList):
+
 	def __init__(self,request,*args,**kwargs):
 		super(DisplayList,self).__init__(request,*args,**kwargs)
 		self.multiple_params_safe = dict(request.GET.lists())
@@ -274,13 +275,21 @@ class DisplayList(ChangeList):
 		multi_page = result_count > self.list_per_page
 
 		# Get the list of objects to display on this page.
+		#
+		# The reason after_pagination_select_related does not affect a
+		# show all query is because this can be potentially dangerous on memory
+		# and I prefer several extra queries over the memory required to
+		# to use select_related on a single large query... this needs testing.
 		if (self.show_all and can_show_all) or not multi_page:
 			result_list = self.query_set._clone()
 		else:
 			try:
 				result_list = paginator.page(self.page_num+1).object_list
+				if self.after_pagination_select_related:
+					result_list = result_list.select_related(*self.after_pagination_select_related)
 			except InvalidPage:
 				result_list = ()
+
 
 		self.result_count = result_count
 		self.full_result_count = full_result_count
@@ -343,6 +352,7 @@ class DisplaySet(adminoptions.ModelAdmin):
 	change_list_template = 'displayset/base.html'
 	use_get_absolute_url = []
 	default_list_display = []
+	after_pagination_select_related = []
 	auto_redirect = False
 	auto_redirect_url = None
 	export = False
@@ -362,6 +372,7 @@ class DisplaySet(adminoptions.ModelAdmin):
 
 	def get_changelist(self,request):
 		DisplayList.filtered_queryset = self.filtered_queryset
+		DisplayList.after_pagination_select_related = self.after_pagination_select_related
 		return DisplayList
 
 	def queryset(self, request):
