@@ -283,7 +283,7 @@ class DisplayList(ChangeList):
 			except InvalidPage:
 				result_list = ()
 
-		if self.after_pagination_select_related:
+		if getattr(self,"after_pagination_select_related",[]):
 			result_list = result_list.select_related(*self.after_pagination_select_related)
 
 		self.result_count = result_count
