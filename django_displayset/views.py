@@ -141,7 +141,12 @@ def csv_export(modeladmin, request, queryset):
 	import re
 	html_re = re.compile("<.*>(.*)</.*>")
 	response = HttpResponse(mimetype='text/csv')
-	response['Content-Disposition'] = 'attachment; filename=%s.csv' % (modeladmin.export_name or queryset.model._meta.verbose_name)
+	try:
+		export_name = modeladmin.export_name
+	except AttributeError:
+		export_name = queryset.model._meta.verbose_name
+	finally:
+		response['Content-Disposition'] = 'attachment; filename=%s.csv' % export_name
 	writer = csv.writer(response)
 	fields = []
 	header = []
