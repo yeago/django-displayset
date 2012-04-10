@@ -6,7 +6,7 @@ except ImportError:
 class ParameterFilterSet(project_filters.FilterSet):
 	def get_parameters(self):
 		parameters = []
-		skip_list = ['submit', 'q', 'o', 'ot', 'p']
+		skip_list = ['submit', 'q', 'o', 'ot', 'p', 'columns']
 
 		if 'submit' in self.data:
 			for h,k in self.data.lists():

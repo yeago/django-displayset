@@ -4,6 +4,7 @@ import csv
 from django.core.exceptions import PermissionDenied
 from django.contrib.admin.views.main import ChangeList
 from django.contrib.admin import options as adminoptions
+from django.contrib.admin.widgets import FilteredSelectMultiple
 from django.core.paginator import Paginator, InvalidPage
 from django.http import HttpResponseRedirect,HttpResponse
 from django.shortcuts import render_to_response
@@ -14,6 +15,7 @@ from django.utils.encoding import force_unicode
 from django.db.models import Q
 from django.db import models
 from django.contrib.admin import helpers
+from django import forms
 from django import template
 
 def cap_first(string):
@@ -28,6 +30,7 @@ def cap_first(string):
 				string = "%s%s%s" % (string[0:i+1], string[i+1].upper(), string[i+2:])
 		return string
 	return None
+
 def pretty(string):
 	if string:
 		if string[0] == "_":
@@ -75,8 +78,8 @@ def filterset_generic(request,filter,display_class,queryset=None,extra_context=N
 	form = filter.form
 
 	updated_params = []
-	for p in params:
-		field, value = p
+	for field,value in params:
+
 		new_value = value
 
 		if hasattr(display,"parameter_fields") and display.parameter_fields.get(field,None):
@@ -84,7 +87,8 @@ def filterset_generic(request,filter,display_class,queryset=None,extra_context=N
 		elif form and field in form.fields:
 
 			if getattr(form.fields[field],'queryset',None):
-				new_value = ', '.join([unicode(o) for o in form.fields[field].queryset.filter(pk__in=value)])
+				selected_set = form.fields[field].queryset.filter(pk__in=value)
+				new_value = ', '.join([form.fields[field].label_from_instance(o) for o in selected_set])
 			elif getattr(form.fields[field],'choices', None):
 				new_value = ', '.join([unicode(c[1]) for c in form.fields[field].choices if unicode(c[0]) in value])
 			else:
@@ -102,7 +106,7 @@ def filterset_generic(request,filter,display_class,queryset=None,extra_context=N
 			for j in range(i+1,len(updated_params)-1):
 				param_name_check = updated_params[j][0][:-1]
 				if param_name == param_name_check:
-					if not range_dict.get(param_name,None):
+					if not param_name in range_dict:
 						range_dict[param_name] = [i]
 					if j not in range_dict[param_name]:
 						range_dict[param_name].append(j)
@@ -126,6 +130,9 @@ def filterset_generic(request,filter,display_class,queryset=None,extra_context=N
 	extra_context.update({'filter': filter})
 
 	return display.changelist_view(request,extra_context)
+
+class ColumnsForm(forms.Form):
+	columns = forms.MultipleChoiceField(required=False,widget=FilteredSelectMultiple("Columns",is_stacked=False))
 
 def list_replace(replacements, original): # replacements are [(index,function),(index,function),...]
 	for item in replacements: # item is (index, function)
@@ -188,13 +195,17 @@ MAX_SHOW_ALL = 1000
 class DisplayList(ChangeList):
 
 	def __init__(self,request,*args,**kwargs):
+
+		self.list_display_links = [None]
 		super(DisplayList,self).__init__(request,*args,**kwargs)
 		self.multiple_params_safe = dict(request.GET.lists())
-		self.model_admin.default_list_display = self.handle_default_display()
-		self.list_display = self.handle_list_display()
+		self.model_admin.list_display_default = self.handle_default_display()
+		self.list_display_options = self.handle_possible_list_display()
+		self.list_display = self.handle_list_display(request)
 		self.order_field, self.order_type = self.get_ordering()
 		self.query_set = self.get_query_set()
 		self.get_results(request)
+
 		if not self.model_admin.actions:
 			try:
 				self.list_display.remove('action_checkbox')
@@ -300,36 +311,86 @@ class DisplayList(ChangeList):
 
 	def handle_default_display(self):
 		replace_list = []
-		for x,f in enumerate(self.model_admin.default_list_display):
+		for x,f in enumerate(self.model_admin.list_display_default):
 			func = self.get_absolute_urlify(f)
 			if func:
 				replace_list.append((x,func))
-		return list_replace(replace_list,self.model_admin.default_list_display)
+		return list_replace(replace_list,self.model_admin.list_display_default)
 
-	def handle_list_display(self):
+	def handle_possible_list_display(self):
+		if not hasattr(self.model_admin,"list_display_options"):
+			self.model_admin.list_display_options = self.model_admin.list_display
+			options = self.model_admin.list_display_options
+
+		else:
+			# incase there are duplicate options, we uniquify
+			options = set(self.model_admin.list_display).union(self.model_admin.list_display_options)
+		
+		options = list(options) # Make a copy of the list
+
+		if helpers.ACTION_CHECKBOX_NAME in options:
+			options.remove(helpers.ACTION_CHECKBOX_NAME)
+
 		replace_list = []
+		for x,f in enumerate(options):
+			func = self.get_absolute_urlify(f)
+			if func:
+				replace_list.append((x,func))
+
+		return list_replace(replace_list,options)
+		#return options
+
+	def handle_list_display(self, request):
+
+		replace_list = []
+
+		if request.GET.getlist('columns'):
+			modified_list_display = []
+			for column in request.GET.getlist('columns'):
+				if column in self.list_display_options:
+					modified_list_display.append(column)
+				else:
+					try:
+						index = [getattr(i,"func_name",None) for i in self.list_display_options].index(column)
+						modified_list_display.append(self.list_display_options[index])
+					except ValueError,IndexError:
+						pass
+
+			if 'action_checkbox' in self.model_admin.list_display:
+				self.model_admin.list_display = ['action_checkbox'] + modified_list_display
+			else:
+				self.model_admin.list_display = modified_list_display
+		
+		"""
 		for x,f in enumerate(self.model_admin.list_display):
 			func = self.get_absolute_urlify(f)
 			if func:
 				replace_list.append((x,func))
+		"""
 
 		self.model_admin.list_display = self.prepend_default_display()
-		return list_replace(replace_list,self.model_admin.list_display)
+
+		#return list_replace(replace_list,self.model_admin.list_display)
+		return self.model_admin.list_display
 
 	def prepend_default_display(self):
 		list_display = self.model_admin.list_display[:]
-		for f in reversed(self.model_admin.default_list_display):
-			if 'action_checkbox' in list_display:
-				list_display.insert(1,f) # action checkbox is in the first slot
-			else: list_display.insert(0,f)
+		for f in reversed(self.model_admin.list_display_default):
+			if f not in list_display:
+				if 'action_checkbox' in list_display:
+					list_display.insert(1,f) # action checkbox is in the first slot
+				else:
+					list_display.insert(0,f)
 		return list_display
 
 	def get_absolute_urlify(self,field):
+
 		func = None
 		if field in self.model_admin.use_get_absolute_url:
 			func = lambda obj: "<a href='%s'>%s</a>" % (obj.get_absolute_url(), getattr(obj,func.field)) # or func.field
 			func.admin_order_field = field
-			func.short_description = field.replace('_',' ')
+			func.short_description = pretty(field)
+			func.func_name = field # Otherwise the func_name is '<lambda>'
 		elif callable(field) and field.__name__ in self.model_admin.use_get_absolute_url:
 			func = lambda obj: "<a href='%s'>%s</a>" % (obj.get_absolute_url, func.field(obj)) # or func.field(obj)
 			try:
@@ -339,7 +400,8 @@ class DisplayList(ChangeList):
 			try:
 				func.short_description = field.short_description
 			except AttributeError:
-				func.short_description = field.__name__
+				func.short_description = pretty(field.func_name)
+			func.func_name = field.func_name # Otherwise the func_name is '<lambda>'
 
 		if func:
 			func.allow_tags = True
@@ -348,22 +410,31 @@ class DisplayList(ChangeList):
 		return None
 
 class DisplaySet(adminoptions.ModelAdmin):
-	#<<<<
 	change_list_template = 'displayset/base.html'
 	use_get_absolute_url = []
-	default_list_display = []
+	list_display_default = [] 
+	use_default_links = False # Set this to true to re-enable the Django automatic links
 	after_pagination_select_related = []
 	auto_redirect = False
 	auto_redirect_url = None
 	export = False
 	export_name = None
+	distinct = False
 
 	def __init__(self,queryset,display_set_site,*args,**kwargs):
+
 		self.filtered_queryset = queryset
 		if self.export:
 			self.actions.append(csv_export)
 		if self.list_display != None:
 			self.list_display = list(self.list_display)
+
+		if not self.list_display_links and not self.use_default_links:
+			"""
+			This removes the default behavior of the ModelAdmin, which
+			tries to place a link on the first column by default
+			"""
+			self.list_display_links = [None]
 
 		super(DisplaySet,self).__init__(queryset.model,display_set_site)
 
@@ -376,8 +447,9 @@ class DisplaySet(adminoptions.ModelAdmin):
 		return DisplayList
 
 	def queryset(self, request):
+		if self.distinct:
+			return self.filtered_queryset.distinct()
 		return self.filtered_queryset
-	#<<<<
 
 	def response_action(self, request, queryset):
 		"""
@@ -478,7 +550,7 @@ class DisplaySet(adminoptions.ModelAdmin):
 			if ERROR_FLAG in request.GET.keys():
 				return render_to_response('admin/invalid_setup.html', {'title': ('Database error')})
 			return HttpResponseRedirect(request.path + '?' + ERROR_FLAG + '=1')
-		#<<<<
+		
 		# if auto_redirect is true we should handle that before anything else
 		if self.auto_redirect and cl.query_set.count() == 1:
 
@@ -490,7 +562,6 @@ class DisplaySet(adminoptions.ModelAdmin):
 
 			if url: # if no url just go ahead and show the display set normally
 				return HttpResponseRedirect(url)
-		#<<<<
 
 		# If the request was POSTed, this might be a bulk action or a bulk
 		# edit. Try to look up an action or confirmation first, but if this
@@ -558,8 +629,33 @@ class DisplaySet(adminoptions.ModelAdmin):
 		else:
 			action_form = None
 
+		# Build the columns form
+		column_form_choices = []
+		column_form_initial = []
+		default_display = getattr(cl.model_admin, "list_display_default", [])
+
+		for item in cl.list_display + cl.list_display_options:
+
+			if item in default_display or item == 'action_checkbox':
+				continue
+	
+			name = getattr(item,"func_name",item)
+		
+			display_name = getattr(item,"short_description",pretty(name))
+
+			if not (name,display_name) in column_form_choices:
+				column_form_choices.append((name,display_name))
+
+			if item in cl.list_display:
+				column_form_initial.append(name)
+
+		columns_form = ColumnsForm(request.GET or None)
+		columns_form.fields['columns'].choices = column_form_choices
+		columns_form.fields['columns'].initial = column_form_initial
+
 		context = {
 			'module_name': force_unicode(opts.verbose_name_plural),
+			'columns_form': columns_form,
 			'title': cl.title,
 			'is_popup': cl.is_popup,
 			'cl': cl,
