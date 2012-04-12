@@ -338,7 +338,6 @@ class DisplayList(ChangeList):
 				replace_list.append((x,func))
 
 		return list_replace(replace_list,options)
-		#return options
 
 	def handle_list_display(self, request):
 
@@ -361,16 +360,8 @@ class DisplayList(ChangeList):
 			else:
 				self.model_admin.list_display = modified_list_display
 		
-		"""
-		for x,f in enumerate(self.model_admin.list_display):
-			func = self.get_absolute_urlify(f)
-			if func:
-				replace_list.append((x,func))
-		"""
-
 		self.model_admin.list_display = self.prepend_default_display()
 
-		#return list_replace(replace_list,self.model_admin.list_display)
 		return self.model_admin.list_display
 
 	def prepend_default_display(self):
@@ -387,12 +378,12 @@ class DisplayList(ChangeList):
 
 		func = None
 		if field in self.model_admin.use_get_absolute_url:
-			func = lambda obj: "<a href='%s'>%s</a>" % (obj.get_absolute_url(), getattr(obj,func.field)) # or func.field
+			func = lambda obj: "<a href=\"%s\">%s</a>" % (obj.get_absolute_url(), getattr(obj,func.field)) # or func.field
 			func.admin_order_field = field
 			func.short_description = pretty(field)
 			func.func_name = field # Otherwise the func_name is '<lambda>'
 		elif callable(field) and field.__name__ in self.model_admin.use_get_absolute_url:
-			func = lambda obj: "<a href='%s'>%s</a>" % (obj.get_absolute_url, func.field(obj)) # or func.field(obj)
+			func = lambda obj: "<a href=\"%s\">%s</a>" % (obj.get_absolute_url, func.field(obj)) # or func.field(obj)
 			try:
 				func.admin_order_field = field.admin_order_field
 			except AttributeError:
