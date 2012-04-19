@@ -1,22 +1,36 @@
 import operator
 import csv
 
+from HTMLParser import HTMLParser
+
+from django import forms
+from django import template
 from django.core.exceptions import PermissionDenied
 from django.contrib.admin.views.main import ChangeList
 from django.contrib.admin import options as adminoptions
+from django.contrib.admin import helpers
+from django.contrib.admin.views.main import ERROR_FLAG
 from django.contrib.admin.widgets import FilteredSelectMultiple
 from django.core.paginator import Paginator, InvalidPage
+from django.db.models import Q
+from django.db import models
 from django.http import HttpResponseRedirect,HttpResponse
 from django.shortcuts import render_to_response
 from django.template import RequestContext
 from django.utils.http import urlencode
 from django.utils.translation import ungettext
 from django.utils.encoding import force_unicode
-from django.db.models import Q
-from django.db import models
-from django.contrib.admin import helpers
-from django import forms
-from django import template
+from django.utils.functional import update_wrapper
+from django.views.decorators.csrf import csrf_protect
+
+class HTMLRemover(HTMLParser):
+	def __init__(self):
+		self.reset()
+		self.fed = []
+	def handle_data(self, d):
+		self.fed.append(d)
+	def get_data(self):
+		return ''.join(self.fed)
 
 def cap_first(string):
 	#This works exactly like string.title(), except it does not remove interior capitalization.
@@ -50,9 +64,7 @@ class DefaultDisplaySite(object):
 	def admin_view(self,view):
 		def no_wrap(request,*args,**kwargs):
 			return view(request,*args,**kwargs)
-		from django.views.decorators.csrf import csrf_protect
-		from django.utils.functional import update_wrapper
-		no_wrap = csrf_protect(no_wrap)
+			no_wrap = csrf_protect(no_wrap)
 		return update_wrapper(no_wrap, view)
 
 def generic(request,queryset,display_class,extra_context=None,display_site=DefaultDisplaySite):
@@ -145,8 +157,6 @@ def list_replace(replacements, original): # replacements are [(index,function),(
 #	export = True
 #	export_name = "display_report" ####makes the file name display_report.csv
 def csv_export(modeladmin, request, queryset):
-	import re
-	html_re = re.compile("<.*>(.*)</.*>")
 	response = HttpResponse(mimetype='text/csv')
 	try:
 		export_name = modeladmin.export_name
@@ -164,27 +174,24 @@ def csv_export(modeladmin, request, queryset):
 				try:
 					header.append(f.short_description)
 				except AttributeError:
-					header.append(f.__name__)
+					header.append(f.func_name)
 				continue
-			fields.append(f);header.append(f)
+			fields.append(f)
+			header.append(f)
 	writer.writerow(header)
 	for obj in queryset:
 		row = []
 		for f in fields:
 			if f != 'action_checkbox':
+				text = ""
 				if callable(f):
-					text = f(obj)
-					try:
-						text = html_re.search(text).groups()[0]
-						row.append(text)
-					except (TypeError,AttributeError): # either we got something like a datetime or no match was found (no html, so its clean)
-						row.append(text)
-					continue
-				try:
-					attr = getattr(obj, f)
-				except AttributeError:
-					attr = "(None)"
-				row.append(attr)
+					text = str(f(obj))
+					htmlremover = HTMLRemover()
+					htmlremover.feed(text)
+					text = htmlremover.get_data()
+				else:
+					text = getattr(obj, f, "(None)")
+				row.append(text)
 		writer.writerow(row)
 	return response
 csv_export.short_description = "Export to Excel"
@@ -198,6 +205,11 @@ class DisplayList(ChangeList):
 
 		self.list_display_links = [None]
 		super(DisplayList,self).__init__(request,*args,**kwargs)
+
+		if hasattr(self.model_admin,'list_display_default') and '__str__' in self.model_admin.list_display:
+			# Remove the Django default display if a new default has been established with the API
+			self.model_admin.list_display.remove('__str__')
+
 		self.multiple_params_safe = dict(request.GET.lists())
 		self.model_admin.list_display_default = self.handle_default_display()
 		self.list_display_options = self.handle_possible_list_display()
@@ -315,6 +327,7 @@ class DisplayList(ChangeList):
 			func = self.get_absolute_urlify(f)
 			if func:
 				replace_list.append((x,func))
+
 		return list_replace(replace_list,self.model_admin.list_display_default)
 
 	def handle_possible_list_display(self):
@@ -332,7 +345,7 @@ class DisplayList(ChangeList):
 			options.remove(helpers.ACTION_CHECKBOX_NAME)
 
 		replace_list = []
-		for x,f in enumerate(options):
+		for x,f in enumerate(set(options).difference(self.model_admin.list_display_default)):
 			func = self.get_absolute_urlify(f)
 			if func:
 				replace_list.append((x,func))
@@ -382,8 +395,8 @@ class DisplayList(ChangeList):
 			func.admin_order_field = field
 			func.short_description = pretty(field)
 			func.func_name = field # Otherwise the func_name is '<lambda>'
-		elif callable(field) and field.__name__ in self.model_admin.use_get_absolute_url:
-			func = lambda obj: "<a href=\"%s\">%s</a>" % (obj.get_absolute_url, func.field(obj)) # or func.field(obj)
+		elif callable(field) and field.func_name in self.model_admin.use_get_absolute_url:
+			func = lambda obj: "<a href=\"%s\">%s</a>" % (obj.get_absolute_url(), func.field(obj)) # or func.field(obj)
 			try:
 				func.admin_order_field = field.admin_order_field
 			except AttributeError:
@@ -512,7 +525,6 @@ class DisplaySet(adminoptions.ModelAdmin):
 
 	def changelist_view(self, request, extra_context=None):
 		"The 'change list' admin view for this model."
-		from django.contrib.admin.views.main import ERROR_FLAG
 		opts = self.model._meta
 		app_label = opts.app_label
 
