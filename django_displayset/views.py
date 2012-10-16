@@ -266,10 +266,11 @@ class DisplayList(ChangeList):
 				return "%s__icontains" % field_name
 
 		if self.search_fields and self.query:
+			orm_queries = orm_lookups = [construct_search(str(search_field)) for search_field in self.search_fields]
 			for bit in self.query.split():
 				or_queries = [models.Q(**{orm_lookup:bit}) for orm_lookup in orm_lookups]
 				qs = qs.filter(reduce(operator.or_, or_queries))
-			return qs;
+		return qs
 
 	def get_results(self, request):
 		paginator = Paginator(self.query_set, self.list_per_page)
