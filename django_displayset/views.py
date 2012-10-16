@@ -198,7 +198,6 @@ csv_export.short_description = "Export to Excel"
 
 ORDER_VAR = 'o'
 ORDER_TYPE_VAR = 'ot'
-MAX_SHOW_ALL = 1000
 class DisplayList(ChangeList):
 
 	def __init__(self,request,*args,**kwargs):
@@ -214,8 +213,8 @@ class DisplayList(ChangeList):
 		self.model_admin.list_display_default = self.handle_default_display()
 		self.list_display_options = self.handle_possible_list_display()
 		self.list_display = self.handle_list_display(request)
-		self.order_field, self.order_type = self.get_ordering()
-		self.query_set = self.get_query_set()
+		self.list_max_show_all = 1000
+		self.query_set = self.get_query_set(request)
 		self.get_results(request)
 
 		if not self.model_admin.actions:
@@ -247,13 +246,13 @@ class DisplayList(ChangeList):
 					final_params.extend([(k, list_value) for list_value in v])
 			else:
 				final_params.append((k,v))
-		#<<<<
 		return '?%s' % urlencode(final_params)
 
-	def get_query_set(self):
+	def get_query_set(self, request):
+		qs = self.root_query_set
 		# Set ordering.
-		if self.order_field:
-			self.filtered_queryset = self.filtered_queryset.order_by('%s%s' % ((self.order_type == 'desc' and '-' or ''), self.order_field))
+		ordering = self.get_ordering(request, qs)
+		qs = qs.order_by(*ordering)
 
 		# Apply keyword searches.
 		def construct_search(field_name):
@@ -268,16 +267,9 @@ class DisplayList(ChangeList):
 
 		if self.search_fields and self.query:
 			for bit in self.query.split():
-				or_queries = [Q(**{construct_search(str(field_name)): bit}) for field_name in self.search_fields]
-				self.filtered_queryset = self.filtered_queryset.filter(reduce(operator.or_, or_queries))
-			for field_name in self.search_fields:
-				if '__' in field_name:
-					self.filtered_queryset = self.filtered_queryset.distinct()
-					break
-
-		return self.filtered_queryset
-
-	#<<<<
+				or_queries = [models.Q(**{orm_lookup:bit}) for orm_lookup in orm_lookups]
+				qs = qs.filter(reduce(operator.or_, or_queries))
+			return qs;
 
 	def get_results(self, request):
 		paginator = Paginator(self.query_set, self.list_per_page)
@@ -299,7 +291,7 @@ class DisplayList(ChangeList):
 
 			#<<<
 
-		can_show_all = MAX_SHOW_ALL #<<<<
+		can_show_all = self.list_max_show_all
 		multi_page = result_count > self.list_per_page
 
 		# Get the list of objects to display on this page.
@@ -542,7 +534,8 @@ class DisplaySet(adminoptions.ModelAdmin):
 		ChangeList = self.get_changelist(request)
 		try:
 			cl = ChangeList(request, self.model, list_display, self.list_display_links, self.list_filter,
-				self.date_hierarchy, self.search_fields, self.list_select_related, self.list_per_page, self.list_editable, self)
+				self.date_hierarchy, self.search_fields, self.list_select_related, self.list_per_page, 
+				self.list_max_show_all, self.list_editable, self)
 		except adminoptions.IncorrectLookupParameters:
 			# Wacky lookup parameters were given, so redirect to the main
 			# changelist page, without parameters, and pass an 'invalid=1'
