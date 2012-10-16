@@ -378,6 +378,9 @@ class DisplayList(ChangeList):
 					list_display.insert(1,f) # action checkbox is in the first slot
 				else:
 					list_display.insert(0,f)
+		if self.model_admin.actions:
+			list_display.insert(0, 'action_checkbox')
+
 		return list_display
 
 	def get_absolute_urlify(self,field):
@@ -569,7 +572,7 @@ class DisplaySet(adminoptions.ModelAdmin):
 
 		# Actions with no confirmation
 		if actions and request.method == 'POST':
-			response = self.response_action(request, queryset=cl.get_query_set())
+			response = self.response_action(request, queryset=cl.get_query_set(request))
 			if response:
 				return response
 
