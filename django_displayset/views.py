@@ -191,7 +191,8 @@ def csv_export(modeladmin, request, queryset):
 					text = htmlremover.get_data()
 				else:
 					text = getattr(obj, f, "(None)")
-				text = text.encode('utf-8')
+				if isinstance(text, basestring):
+					text = text.encode('utf-8')
 				row.append(text)
 		writer.writerow(row)
 	return response
