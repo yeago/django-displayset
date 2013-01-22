@@ -201,6 +201,7 @@ csv_export.short_description = "Export to Excel"
 ORDER_VAR = 'o'
 ORDER_TYPE_VAR = 'ot'
 class DisplayList(ChangeList):
+	absolute_urlified = set()
 
 	def __init__(self,request,*args,**kwargs):
 
@@ -386,14 +387,20 @@ class DisplayList(ChangeList):
 		return list_display
 
 	def get_absolute_urlify(self,field):
+		if field in self.absolute_urlified or (callable(field) and field.func_name in self.absolute_urlified):
+			return field
 
 		func = None
+
 		if field in self.model_admin.use_get_absolute_url:
 			func = lambda obj: "<a href=\"%s\">%s</a>" % (obj.get_absolute_url(), getattr(obj,func.field)) # or func.field
 			func.admin_order_field = field
 			func.short_description = pretty(field)
 			func.func_name = field # Otherwise the func_name is '<lambda>'
+			self.absolute_urlified.add(field)
+
 		elif callable(field) and field.func_name in self.model_admin.use_get_absolute_url:
+
 			func = lambda obj: "<a href=\"%s\">%s</a>" % (obj.get_absolute_url(), func.field(obj)) # or func.field(obj)
 			try:
 				func.admin_order_field = field.admin_order_field
@@ -404,12 +411,13 @@ class DisplayList(ChangeList):
 			except AttributeError:
 				func.short_description = pretty(field.func_name)
 			func.func_name = field.func_name # Otherwise the func_name is '<lambda>'
+			self.absolute_urlified.add(field.func_name)
 
 		if func:
 			func.allow_tags = True
 			func.field = field
-			return func
-		return None
+
+		return func
 
 class DisplaySet(adminoptions.ModelAdmin):
 	change_list_template = 'displayset/base.html'
