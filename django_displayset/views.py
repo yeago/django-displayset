@@ -201,10 +201,10 @@ csv_export.short_description = "Export to Excel"
 ORDER_VAR = 'o'
 ORDER_TYPE_VAR = 'ot'
 class DisplayList(ChangeList):
-	absolute_urlified = set()
 
 	def __init__(self,request,*args,**kwargs):
 
+		self.absolute_urlified = set()
 		self.list_display_links = [None]
 		super(DisplayList,self).__init__(request,*args,**kwargs)
 
@@ -320,9 +320,10 @@ class DisplayList(ChangeList):
 	def handle_default_display(self):
 		replace_list = []
 		for x,f in enumerate(self.model_admin.list_display_default):
-			func = self.get_absolute_urlify(f)
-			if func:
-				replace_list.append((x,func))
+			if not self.is_absolute_urlified(f):
+				func = self.get_absolute_urlify(f)
+				if func:
+					replace_list.append((x,func))
 
 		return list_replace(replace_list,self.model_admin.list_display_default)
 
@@ -335,39 +336,39 @@ class DisplayList(ChangeList):
 			# incase there are duplicate options, we uniquify
 			options = set(self.model_admin.list_display).union(self.model_admin.list_display_options)
 		
-		options = list(options) # Make a copy of the list
+		options = list(set(options).difference(self.model_admin.list_display_default))
 
 		if helpers.ACTION_CHECKBOX_NAME in options:
 			options.remove(helpers.ACTION_CHECKBOX_NAME)
 
 		replace_list = []
-		for x,f in enumerate(set(options).difference(self.model_admin.list_display_default)):
-			func = self.get_absolute_urlify(f)
-			if func:
-				replace_list.append((x,func))
+		for x,f in enumerate(options):
+			if not self.is_absolute_urlified(f):
+				func = self.get_absolute_urlify(f)
+				if func:
+					replace_list.append((x,func))
 
 		return list_replace(replace_list,options)
 
 	def handle_list_display(self, request):
 
-		replace_list = []
+		columns = request.GET.getlist('columns') or self.model_admin.list_display
 
-		if request.GET.getlist('columns'):
-			modified_list_display = []
-			for column in request.GET.getlist('columns'):
-				if column in self.list_display_options:
-					modified_list_display.append(column)
-				else:
-					try:
-						index = [getattr(i,"func_name",None) for i in self.list_display_options].index(column)
-						modified_list_display.append(self.list_display_options[index])
-					except ValueError,IndexError:
-						pass
-
-			if 'action_checkbox' in self.model_admin.list_display:
-				self.model_admin.list_display = ['action_checkbox'] + modified_list_display
+		modified_list_display = []
+		for column in columns:
+			if column in self.list_display_options:
+				modified_list_display.append(column)
 			else:
-				self.model_admin.list_display = modified_list_display
+				try:
+					index = [getattr(i,"func_name",None) for i in self.list_display_options].index(column)
+					modified_list_display.append(self.list_display_options[index])
+				except ValueError,IndexError:
+					pass
+
+		if 'action_checkbox' in self.model_admin.list_display:
+			self.model_admin.list_display = ['action_checkbox'] + modified_list_display
+		else:
+			self.model_admin.list_display = modified_list_display
 		
 		self.model_admin.list_display = self.prepend_default_display()
 
@@ -386,10 +387,12 @@ class DisplayList(ChangeList):
 
 		return list_display
 
-	def get_absolute_urlify(self,field):
+	def is_absolute_urlified(self,field):
 		if field in self.absolute_urlified or (callable(field) and field.func_name in self.absolute_urlified):
-			return field
+			return True
+		return False
 
+	def get_absolute_urlify(self,field):
 		func = None
 
 		if field in self.model_admin.use_get_absolute_url:
