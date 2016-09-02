@@ -1,5 +1,6 @@
 import operator
 import csv
+from functools import update_wrapper
 
 from HTMLParser import HTMLParser
 
@@ -20,7 +21,6 @@ from django.template import RequestContext
 from django.utils.http import urlencode
 from django.utils.translation import ungettext
 from django.utils.encoding import force_unicode
-from django.utils.functional import update_wrapper
 from django.views.decorators.csrf import csrf_protect
 
 class HTMLRemover(HTMLParser):
